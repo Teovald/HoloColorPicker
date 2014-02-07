@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.larswerkman.colorpicker;
+package com.larswerkman.holocolorpicker;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -313,7 +313,9 @@ public class ColorPicker extends View {
 		mCenterHaloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 		mCenterHaloPaint.setColor(Color.BLACK);
 		mCenterHaloPaint.setAlpha(0x00);
-
+		
+		mCenterNewColor = calculateColor(mAngle);
+		mCenterOldColor = calculateColor(mAngle);
 	}
 
 	@Override
@@ -380,8 +382,7 @@ public class ColorPicker extends View {
 		mTranslationOffset = min * 0.5f;
 
 		// fill the rectangle instances.
-		mColorWheelRadius = min / 2 - mColorWheelThickness
-				- (mColorPointerHaloRadius / 2);
+		mColorWheelRadius = min / 2 - mColorWheelThickness - mColorPointerHaloRadius;
 		mColorWheelRectangle.set(-mColorWheelRadius, -mColorWheelRadius,
 				mColorWheelRadius, mColorWheelRadius);
 
@@ -458,6 +459,7 @@ public class ColorPicker extends View {
 	public void setColor(int color) {
 		mAngle = colorToAngle(color);
 		mPointerColor.setColor(calculateColor(mAngle));
+		mCenterNewPaint.setColor(calculateColor(mAngle));
 
 		// check of the instance isn't null
 		if (mOpacityBar != null) {
@@ -535,13 +537,17 @@ public class ColorPicker extends View {
 				mUserIsMovingPointer = true;
 				invalidate();
 			}
-			// Check wheter the user pressed on the center.
-			if (x >= -mColorCenterRadius && x <= mColorCenterRadius
+			// Check whether the user pressed on the center.
+			else if (x >= -mColorCenterRadius && x <= mColorCenterRadius
 					&& y >= -mColorCenterRadius && y <= mColorCenterRadius) {
 				mCenterHaloPaint.setAlpha(0x50);
 				setColor(getOldCenterColor());
-				mCenterNewPaint.setColor(getOldCenterColor());
 				invalidate();
+			}
+			// If user did not press pointer or center, report event not handled
+			else{
+				getParent().requestDisallowInterceptTouchEvent(false);
+				return false;
 			}
 			break;
 		case MotionEvent.ACTION_MOVE:
@@ -568,6 +574,11 @@ public class ColorPicker extends View {
 				}
 
 				invalidate();
+			}
+			// If user did not press pointer or center, report event not handled
+			else{
+				getParent().requestDisallowInterceptTouchEvent(false);
+				return false;
 			}
 			break;
 		case MotionEvent.ACTION_UP:
@@ -728,6 +739,8 @@ public class ColorPicker extends View {
 
 		mAngle = savedState.getFloat(STATE_ANGLE);
 		setOldCenterColor(savedState.getInt(STATE_OLD_COLOR));
-		mPointerColor.setColor(calculateColor(mAngle));
+		int currentColor = calculateColor(mAngle);
+		mPointerColor.setColor(currentColor);
+		setNewCenterColor(currentColor);
 	}
 }

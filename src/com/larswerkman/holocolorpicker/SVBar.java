@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.larswerkman.colorpicker;
+package com.larswerkman.holocolorpicker;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -30,8 +30,9 @@ import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.View.MeasureSpec;
 
-public class SaturationBar extends View {
+public class SVBar extends View {
 
 	/*
 	 * Constants used to save/restore the instance state.
@@ -39,6 +40,19 @@ public class SaturationBar extends View {
 	private static final String STATE_PARENT = "parent";
 	private static final String STATE_COLOR = "color";
 	private static final String STATE_SATURATION = "saturation";
+	private static final String STATE_VALUE = "value";
+	private static final String STATE_ORIENTATION = "orientation";
+	
+	/**
+	 * Constants used to identify orientation.
+	 */
+	private static final boolean ORIENTATION_HORIZONTAL = true;
+	private static final boolean ORIENTATION_VERTICAL = false;
+	
+	/**
+	 * Default orientation of the bar.
+	 */
+	private static final boolean ORIENTATION_DEFAULT = ORIENTATION_HORIZONTAL;
 
 	/**
 	 * The thickness of the bar.
@@ -106,36 +120,41 @@ public class SaturationBar extends View {
 
 	/**
 	 * An array of floats that can be build into a {@code Color} <br>
-	 * Where we can extract the color from.
+	 * Where we can extract the Saturation and Value from.
 	 */
 	private float[] mHSVColor = new float[3];
 
 	/**
-	 * Factor used to calculate the position to the Opacity on the bar.
+	 * Factor used to calculate the position to the Saturation/Value on the bar.
 	 */
-	private float mPosToSatFactor;
+	private float mPosToSVFactor;
 
 	/**
-	 * Factor used to calculate the Opacity to the postion on the bar.
+	 * Factor used to calculate the Saturation/Value to the postion on the bar.
 	 */
-	private float mSatToPosFactor;
+	private float mSVToPosFactor;
 
 	/**
 	 * {@code ColorPicker} instance used to control the ColorPicker.
 	 */
 	private ColorPicker mPicker = null;
 
-	public SaturationBar(Context context) {
+	/**
+	 * Used to toggle orientation between vertical and horizontal.
+	 */
+	private boolean mOrientation;
+
+	public SVBar(Context context) {
 		super(context);
 		init(null, 0);
 	}
 
-	public SaturationBar(Context context, AttributeSet attrs) {
+	public SVBar(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		init(attrs, 0);
 	}
 
-	public SaturationBar(Context context, AttributeSet attrs, int defStyle) {
+	public SVBar(Context context, AttributeSet attrs, int defStyle) {
 		super(context, attrs, defStyle);
 		init(attrs, defStyle);
 	}
@@ -157,13 +176,15 @@ public class SaturationBar extends View {
 		mBarPointerHaloRadius = a.getDimensionPixelSize(
 				R.styleable.ColorBars_bar_pointer_halo_radius,
 				b.getDimensionPixelSize(R.dimen.bar_pointer_halo_radius));
+		mOrientation = a.getBoolean(
+				R.styleable.ColorBars_bar_orientation_horizontal, ORIENTATION_DEFAULT);
 
 		a.recycle();
 
 		mBarPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 		mBarPaint.setShader(shader);
 
-		mBarPointerPosition = mBarLength + mBarPointerHaloRadius;
+		mBarPointerPosition = (mBarLength / 2) + mBarPointerHaloRadius;
 
 		mBarPointerHaloPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 		mBarPointerHaloPaint.setColor(Color.BLACK);
@@ -172,8 +193,8 @@ public class SaturationBar extends View {
 		mBarPointerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 		mBarPointerPaint.setColor(0xff81ff00);
 
-		mPosToSatFactor = 1 / ((float) mBarLength);
-		mSatToPosFactor = ((float) mBarLength) / 1;
+		mPosToSVFactor = 1 / ((float) mBarLength / 2);
+		mSVToPosFactor = ((float) mBarLength / 2) / 1;
 	}
 
 	@Override
@@ -181,60 +202,94 @@ public class SaturationBar extends View {
 		final int intrinsicSize = mPreferredBarLength
 				+ (mBarPointerHaloRadius * 2);
 
-		int widthMode = MeasureSpec.getMode(widthMeasureSpec);
-		int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+		// Variable orientation
+		int measureSpec;
+		if (mOrientation == ORIENTATION_HORIZONTAL) {
+			measureSpec = widthMeasureSpec;
+		}
+		else {
+			measureSpec = heightMeasureSpec;
+		}
+		int lengthMode = MeasureSpec.getMode(measureSpec);
+		int lengthSize = MeasureSpec.getSize(measureSpec);
 
-		int width;
-		if (widthMode == MeasureSpec.EXACTLY) {
-			width = widthSize;
-		} else if (widthMode == MeasureSpec.AT_MOST) {
-			width = Math.min(intrinsicSize, widthSize);
-		} else {
-			width = intrinsicSize;
+		int length;
+		if (lengthMode == MeasureSpec.EXACTLY) {
+			length = lengthSize;
+		}
+		else if (lengthMode == MeasureSpec.AT_MOST) {
+			length = Math.min(intrinsicSize, lengthSize);
+		}
+		else {
+			length = intrinsicSize;
 		}
 
-		mBarLength = width - (mBarPointerHaloRadius * 2);
-		setMeasuredDimension((mBarLength + (mBarPointerHaloRadius * 2)),
-				(mBarPointerHaloRadius * 2));
+		int barPointerHaloRadiusx2 = mBarPointerHaloRadius * 2;
+		mBarLength = length - barPointerHaloRadiusx2;
+		if(mOrientation == ORIENTATION_VERTICAL) {
+			setMeasuredDimension(barPointerHaloRadiusx2,
+			        	(mBarLength + barPointerHaloRadiusx2));
+		}
+		else {
+			setMeasuredDimension((mBarLength + barPointerHaloRadiusx2),
+						barPointerHaloRadiusx2);
+		}
 	}
 
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
 		super.onSizeChanged(w, h, oldw, oldh);
-		mBarLength = w - (mBarPointerHaloRadius * 2);
 
-		// Fill the rectangle instance.
-		mBarRect.set(mBarPointerHaloRadius,
-				(mBarPointerHaloRadius - (mBarThickness / 2)),
-				(mBarLength + (mBarPointerHaloRadius)),
-				(mBarPointerHaloRadius + (mBarThickness / 2)));
+		// Fill the rectangle instance based on orientation
+		int x1, y1;
+		if (mOrientation == ORIENTATION_HORIZONTAL) {
+			x1 = (mBarLength + mBarPointerHaloRadius);
+			y1 = mBarThickness;
+			mBarLength = w - (mBarPointerHaloRadius * 2);
+			mBarRect.set(mBarPointerHaloRadius,
+					(mBarPointerHaloRadius - (mBarThickness / 2)),
+					(mBarLength + (mBarPointerHaloRadius)),
+					(mBarPointerHaloRadius + (mBarThickness / 2)));
+		}
+		else {
+			x1 = mBarThickness;
+			y1 = (mBarLength + mBarPointerHaloRadius);
+			mBarLength = h - (mBarPointerHaloRadius * 2);
+			mBarRect.set(mBarPointerHaloRadius,
+					(mBarPointerHaloRadius - (mBarThickness / 2)),
+					(mBarPointerHaloRadius + (mBarThickness / 2)),
+					(mBarLength + (mBarPointerHaloRadius)));
+		}
 
 		// Update variables that depend of mBarLength.
 		if(!isInEditMode()){
 			shader = new LinearGradient(mBarPointerHaloRadius, 0,
-					(mBarLength + mBarPointerHaloRadius), mBarThickness, new int[] {
-							Color.WHITE,
-							Color.HSVToColor(0xFF, mHSVColor) }, null,
-					Shader.TileMode.CLAMP);
+					x1, y1, new int[] {
+							0xffffffff, Color.HSVToColor(mHSVColor), 0xff000000 },
+					null, Shader.TileMode.CLAMP);
 		} else {
 			shader = new LinearGradient(mBarPointerHaloRadius, 0,
-					(mBarLength + mBarPointerHaloRadius), mBarThickness, new int[] {
-							Color.WHITE, 0xff81ff00 }, null, Shader.TileMode.CLAMP);
+					x1, y1, new int[] {
+							0xffffffff, 0xff81ff00, 0xff000000 }, null,
+					Shader.TileMode.CLAMP);
 			Color.colorToHSV(0xff81ff00, mHSVColor);
 		}
 		
 		mBarPaint.setShader(shader);
-		mPosToSatFactor = 1 / ((float) mBarLength);
-		mSatToPosFactor = ((float) mBarLength) / 1;
-		
+		mPosToSVFactor = 1 / ((float) mBarLength / 2);
+		mSVToPosFactor = ((float) mBarLength / 2) / 1;
 		float[] hsvColor = new float[3];
 		Color.colorToHSV(mColor, hsvColor);
-		
-		if(!isInEditMode()){
-			mBarPointerPosition = Math.round((mSatToPosFactor* hsvColor[1])
+		if (hsvColor[1] < hsvColor[2]) {
+			mBarPointerPosition = Math.round((mSVToPosFactor * hsvColor[1])
 					+ mBarPointerHaloRadius);
 		} else {
-			mBarPointerPosition = mBarLength + mBarPointerHaloRadius;
+			mBarPointerPosition = Math
+					.round((mSVToPosFactor * (1 - hsvColor[2]))
+							+ mBarPointerHaloRadius + (mBarLength / 2));
+		}
+		if(isInEditMode()){
+			mBarPointerPosition = (mBarLength / 2) + mBarPointerHaloRadius;
 		}
 	}
 
@@ -242,12 +297,22 @@ public class SaturationBar extends View {
 	protected void onDraw(Canvas canvas) {
 		// Draw the bar.
 		canvas.drawRect(mBarRect, mBarPaint);
+
+		// Calculate the center of the pointer.
+		int cX, cY;
+		if (mOrientation == ORIENTATION_HORIZONTAL) {
+			cX = mBarPointerPosition;
+			cY = mBarPointerHaloRadius;
+		}
+		else {
+			cX = mBarPointerHaloRadius;
+			cY = mBarPointerPosition;
+		}
+		
 		// Draw the pointer halo.
-		canvas.drawCircle(mBarPointerPosition, mBarPointerHaloRadius,
-				mBarPointerHaloRadius, mBarPointerHaloPaint);
+		canvas.drawCircle(cX, cY, mBarPointerHaloRadius, mBarPointerHaloPaint);
 		// Draw the pointer.
-		canvas.drawCircle(mBarPointerPosition, mBarPointerHaloRadius,
-				mBarPointerRadius, mBarPointerPaint);
+		canvas.drawCircle(cX, cY, mBarPointerRadius, mBarPointerPaint);
 	};
 
 	@Override
@@ -255,17 +320,22 @@ public class SaturationBar extends View {
 		getParent().requestDisallowInterceptTouchEvent(true);
 
 		// Convert coordinates to our internal coordinate system
-		float x = event.getX();
+		float dimen;
+		if (mOrientation == ORIENTATION_HORIZONTAL) {
+			dimen = event.getX();
+		}
+		else {
+			dimen = event.getY();
+		}
 
 		switch (event.getAction()) {
 		case MotionEvent.ACTION_DOWN:
 		    	mIsMovingPointer = true;
-			// Check whether the user pressed on (or near) the pointer
-			if (x >= (mBarPointerHaloRadius)
-					&& x <= (mBarPointerHaloRadius + mBarLength))
-			{
-				mBarPointerPosition = Math.round(x);
-				calculateColor(Math.round(x));
+			// Check whether the user pressed on the pointer
+			if (dimen >= (mBarPointerHaloRadius)
+					&& dimen <= (mBarPointerHaloRadius + mBarLength)) {
+				mBarPointerPosition = Math.round(dimen);
+				calculateColor(Math.round(dimen));
 				mBarPointerPaint.setColor(mColor);
 				invalidate();
 			}
@@ -273,34 +343,31 @@ public class SaturationBar extends View {
 		case MotionEvent.ACTION_MOVE:
 			if (mIsMovingPointer) {
 				// Move the the pointer on the bar.
-				if (x >= mBarPointerHaloRadius
-						&& x <= (mBarPointerHaloRadius + mBarLength)) {
-					mBarPointerPosition = Math.round(x);
-					calculateColor(Math.round(x));
+				if (dimen >= mBarPointerHaloRadius
+						&& dimen <= (mBarPointerHaloRadius + mBarLength)) {
+					mBarPointerPosition = Math.round(dimen);
+					calculateColor(Math.round(dimen));
 					mBarPointerPaint.setColor(mColor);
 					if (mPicker != null) {
 						mPicker.setNewCenterColor(mColor);
-						mPicker.changeValueBarColor(mColor);
 						mPicker.changeOpacityBarColor(mColor);
 					}
 					invalidate();
-				} else if (x < mBarPointerHaloRadius) {
+				} else if (dimen < mBarPointerHaloRadius) {
 					mBarPointerPosition = mBarPointerHaloRadius;
 					mColor = Color.WHITE;
 					mBarPointerPaint.setColor(mColor);
 					if (mPicker != null) {
 						mPicker.setNewCenterColor(mColor);
-						mPicker.changeValueBarColor(mColor);
 						mPicker.changeOpacityBarColor(mColor);
 					}
 					invalidate();
-				} else if (x > (mBarPointerHaloRadius + mBarLength)) {
+				} else if (dimen > (mBarPointerHaloRadius + mBarLength)) {
 					mBarPointerPosition = mBarPointerHaloRadius + mBarLength;
-					mColor = Color.HSVToColor(mHSVColor);
+					mColor = Color.BLACK;
 					mBarPointerPaint.setColor(mColor);
 					if (mPicker != null) {
 						mPicker.setNewCenterColor(mColor);
-						mPicker.changeValueBarColor(mColor);
 						mPicker.changeOpacityBarColor(mColor);
 					}
 					invalidate();
@@ -315,6 +382,46 @@ public class SaturationBar extends View {
 	}
 
 	/**
+	 * Set the pointer on the bar. With the saturation value.
+	 * 
+	 * @param saturation
+	 *            float between 0 > 1
+	 */
+	public void setSaturation(float saturation) {
+		mBarPointerPosition = Math.round((mSVToPosFactor * saturation)
+				+ mBarPointerHaloRadius);
+		calculateColor(mBarPointerPosition);
+		mBarPointerPaint.setColor(mColor);
+		// Check whether the Saturation/Value bar is added to the ColorPicker
+		// wheel
+		if (mPicker != null) {
+			mPicker.setNewCenterColor(mColor);
+			mPicker.changeOpacityBarColor(mColor);
+		}
+		invalidate();
+	}
+
+	/**
+	 * Set the pointer on the bar. With the Value value.
+	 * 
+	 * @param value
+	 *            float between 0 > 1
+	 */
+	public void setValue(float value) {
+		mBarPointerPosition = Math.round((mSVToPosFactor * (1 - value))
+				+ mBarPointerHaloRadius + (mBarLength / 2));
+		calculateColor(mBarPointerPosition);
+		mBarPointerPaint.setColor(mColor);
+		// Check whether the Saturation/Value bar is added to the ColorPicker
+		// wheel
+		if (mPicker != null) {
+			mPicker.setNewCenterColor(mColor);
+			mPicker.changeOpacityBarColor(mColor);
+		}
+		invalidate();
+	}
+
+	/**
 	 * Set the bar color. <br>
 	 * <br>
 	 * Its discouraged to use this method.
@@ -322,58 +429,63 @@ public class SaturationBar extends View {
 	 * @param color
 	 */
 	public void setColor(int color) {
+		int x1, y1;
+		if(mOrientation == ORIENTATION_HORIZONTAL) {
+			x1 = (mBarLength + mBarPointerHaloRadius);
+			y1 = mBarThickness;
+		}
+		else {
+			x1 = mBarThickness;
+			y1 = (mBarLength + mBarPointerHaloRadius);
+		}
+		
 		Color.colorToHSV(color, mHSVColor);
 		shader = new LinearGradient(mBarPointerHaloRadius, 0,
-				(mBarLength + mBarPointerHaloRadius), mBarThickness, new int[] {
-						Color.WHITE, color }, null,
+				x1, y1, new int[] {
+						0xffffffff, color, 0xff000000 }, null,
 				Shader.TileMode.CLAMP);
 		mBarPaint.setShader(shader);
 		calculateColor(mBarPointerPosition);
 		mBarPointerPaint.setColor(mColor);
 		if (mPicker != null) {
 			mPicker.setNewCenterColor(mColor);
-			mPicker.changeValueBarColor(mColor);
 			mPicker.changeOpacityBarColor(mColor);
 		}
 		invalidate();
 	}
 
 	/**
-	 * Set the pointer on the bar. With the opacity value.
+	 * Calculate the color selected by the pointer on the bar.
 	 * 
-	 * @param saturation
-	 *            float between 0 > 1
+	 * @param coord
+	 *            Coordinate of the pointer.
 	 */
-	public void setSaturation(float saturation) {
-		mBarPointerPosition = Math.round((mSatToPosFactor * saturation))
-				+ mBarPointerHaloRadius;
-		calculateColor(mBarPointerPosition);
-		mBarPointerPaint.setColor(mColor);
-		if (mPicker != null) {
-			mPicker.setNewCenterColor(mColor);
-			mPicker.changeValueBarColor(mColor);
-			mPicker.changeOpacityBarColor(mColor);
-		}
-		invalidate();
-	}
-
-        /**
-         * Calculate the color selected by the pointer on the bar.
-         * 
-         * @param x
-         *            X-Coordinate of the pointer.
-         */
-	private void calculateColor(int x) {
-	    x = x - mBarPointerHaloRadius;
-	    if (x < 0) {
-		x = 0;
-	    } else if (x > mBarLength) {
-		x = mBarLength;
+	private void calculateColor(int coord) {
+	    coord = coord - mBarPointerHaloRadius;
+	    if (coord < 0) {
+	    	coord = 0;
+	    } else if (coord > mBarLength) {
+	    	coord = mBarLength;
 	    }
-	    mColor = Color.HSVToColor(new float[] { mHSVColor[0],
-                                                    (float) ((mPosToSatFactor * x)), 
-		    				    1f });
-    }
+	    
+		if (coord > (mBarPointerHaloRadius + (mBarLength / 2))
+				&& coord < (mBarPointerHaloRadius + mBarLength)) {
+			mColor = Color
+					.HSVToColor(new float[] {
+							mHSVColor[0],
+							1f,
+							(float) (1 - (mPosToSVFactor * (coord - (mBarPointerHaloRadius + (mBarLength / 2))))) });
+		} else if (coord > mBarPointerHaloRadius
+				&& coord < (mBarPointerHaloRadius + mBarLength)) {
+			mColor = Color.HSVToColor(new float[] { mHSVColor[0],
+					(float) ((mPosToSVFactor * (coord - mBarPointerHaloRadius))),
+					1f });
+		} else if (coord == mBarPointerHaloRadius) {
+			mColor = Color.WHITE;
+		} else if (coord == mBarPointerHaloRadius + mBarLength) {
+			mColor = Color.BLACK;
+		}
+	}
 
 	/**
 	 * Get the currently selected color.
@@ -404,10 +516,14 @@ public class SaturationBar extends View {
 		Bundle state = new Bundle();
 		state.putParcelable(STATE_PARENT, superState);
 		state.putFloatArray(STATE_COLOR, mHSVColor);
-		
 		float[] hsvColor = new float[3];
 		Color.colorToHSV(mColor, hsvColor);
-		state.putFloat(STATE_SATURATION, hsvColor[1]);
+		if (hsvColor[1] < hsvColor[2]) {
+			state.putFloat(STATE_SATURATION, hsvColor[1]);
+		} else {
+			state.putFloat(STATE_VALUE, hsvColor[2]);
+		}
+		state.putBoolean(STATE_ORIENTATION, ORIENTATION_HORIZONTAL);
 
 		return state;
 	}
@@ -420,6 +536,11 @@ public class SaturationBar extends View {
 		super.onRestoreInstanceState(superState);
 
 		setColor(Color.HSVToColor(savedState.getFloatArray(STATE_COLOR)));
-		setSaturation(savedState.getFloat(STATE_SATURATION));
+		if (savedState.containsKey(STATE_SATURATION)) {
+			setSaturation(savedState.getFloat(STATE_SATURATION));
+		} else {
+			setValue(savedState.getFloat(STATE_VALUE));
+		}
+		mOrientation = savedState.getBoolean(STATE_ORIENTATION, ORIENTATION_DEFAULT);
 	}
 }
