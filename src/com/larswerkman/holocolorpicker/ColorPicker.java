@@ -526,31 +526,35 @@ public class ColorPicker extends View {
 		float x = event.getX() - mTranslationOffset;
 		float y = event.getY() - mTranslationOffset;
 
-		switch (event.getAction()) {
-		case MotionEvent.ACTION_DOWN:
-			// Check whether the user pressed on the pointer.
-			float[] pointerPosition = calculatePointerPosition(mAngle);
-			if (x >= (pointerPosition[0] - mColorPointerHaloRadius)
-					&& x <= (pointerPosition[0] + mColorPointerHaloRadius)
-					&& y >= (pointerPosition[1] - mColorPointerHaloRadius)
-					&& y <= (pointerPosition[1] + mColorPointerHaloRadius)) {
-				mUserIsMovingPointer = true;
-				invalidate();
-			}
-			// Check whether the user pressed on the center.
-			else if (x >= -mColorCenterRadius && x <= mColorCenterRadius
-					&& y >= -mColorCenterRadius && y <= mColorCenterRadius) {
-				mCenterHaloPaint.setAlpha(0x50);
-				setColor(getOldCenterColor());
-				invalidate();
-			}
-			// If user did not press pointer or center, report event not handled
-			else{
-				getParent().requestDisallowInterceptTouchEvent(false);
-				return false;
-			}
-			break;
-		case MotionEvent.ACTION_MOVE:
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+
+                float radius = (float) Math.sqrt(x * x + y * y);
+                float minColorWheelPickingRadius = mColorWheelRadius - 2 * mColorPointerHaloRadius;
+                float maxColorWheelPickingRadius = mColorWheelRadius + 2 * mColorPointerHaloRadius;
+
+                if (radius >= minColorWheelPickingRadius && radius <= maxColorWheelPickingRadius) {
+                    // the user pressed the wheel
+                    mAngle = (float) Math.atan2(y, x);
+                    mUserIsMovingPointer = true;
+                    //updateColor(calculateColor(mAngle));
+                    setColor(calculateColor(mAngle));
+                    invalidate();
+                    break;
+                } else if (radius <= mColorCenterRadius) {
+                    // the user pressed the center
+                    mCenterHaloPaint.setAlpha(0x50);
+                    setColor(getOldCenterColor());
+                    mCenterNewPaint.setColor(getOldCenterColor());
+
+                    invalidate();
+                } else {
+                    // irrelevant tap
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                    return false;
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
 			if (mUserIsMovingPointer) {
 				mAngle = (float) java.lang.Math.atan2(y, x);
 				mPointerColor.setColor(calculateColor(mAngle));
