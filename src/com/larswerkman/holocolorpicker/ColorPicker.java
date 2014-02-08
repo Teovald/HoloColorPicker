@@ -517,8 +517,36 @@ public class ColorPicker extends View {
 		
 		return (float) Math.toRadians(-colors[0]);
 	}
-	
-	@Override
+
+
+    /**
+     * Updates all components with a new color from the color wheel,
+     * without changing opacity, saturation or value.
+     */
+    private void updateColor(int color) {
+        mPointerColor.setColor(color);
+
+        setNewCenterColor(color);
+
+        if (mOpacityBar != null) {
+            mOpacityBar.setColor(mColor);
+        }
+
+        if (mValueBar != null) {
+            mValueBar.setColor(mColor);
+        }
+
+        if (mSaturationBar != null) {
+            mSaturationBar.setColor(mColor);
+        }
+
+        if (mSVbar != null) {
+            mSVbar.setColor(mColor);
+        }
+    }
+
+
+    @Override
 	public boolean onTouchEvent(MotionEvent event) {
 		getParent().requestDisallowInterceptTouchEvent(true);
 
@@ -537,8 +565,7 @@ public class ColorPicker extends View {
                     // the user pressed the wheel
                     mAngle = (float) Math.atan2(y, x);
                     mUserIsMovingPointer = true;
-                    //updateColor(calculateColor(mAngle));
-                    setColor(calculateColor(mAngle));
+                    updateColor(calculateColor(mAngle));
                     invalidate();
                     break;
                 } else if (radius <= mColorCenterRadius) {
@@ -555,35 +582,16 @@ public class ColorPicker extends View {
                 }
                 break;
             case MotionEvent.ACTION_MOVE:
-			if (mUserIsMovingPointer) {
-				mAngle = (float) java.lang.Math.atan2(y, x);
-				mPointerColor.setColor(calculateColor(mAngle));
 
-				setNewCenterColor(mCenterNewColor = calculateColor(mAngle));
+                if (mUserIsMovingPointer) {
+                    mAngle = (float) Math.atan2(y, x);
+                    updateColor(calculateColor(mAngle));
+                    invalidate();
+                } else {
+                    getParent().requestDisallowInterceptTouchEvent(false);
+                    return false;
+                }
 
-				if (mOpacityBar != null) {
-					mOpacityBar.setColor(mColor);
-				}
-
-				if (mValueBar != null) {
-					mValueBar.setColor(mColor);
-				}
-
-				if (mSaturationBar != null) {
-					mSaturationBar.setColor(mColor);
-				}
-
-				if (mSVbar != null) {
-					mSVbar.setColor(mColor);
-				}
-
-				invalidate();
-			}
-			// If user did not press pointer or center, report event not handled
-			else{
-				getParent().requestDisallowInterceptTouchEvent(false);
-				return false;
-			}
 			break;
 		case MotionEvent.ACTION_UP:
 			mUserIsMovingPointer = false;
